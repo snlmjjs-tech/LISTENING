@@ -328,6 +328,7 @@
       status.textContent = "Clave guardada. Ya puedes escuchar el audio con voces naturales (ElevenLabs).";
       status.className = "text-emerald-400";
       elevenLabsCache = {};
+      elevenLabsVoicesCache = null;
     }
 
     function initApiKeyPanel() {
@@ -350,7 +351,6 @@
     let webSpeechIndex = 0;
     let elevenLabsIndex = 0;
     let elevenLabsCache = {}; // levelKey -> array de blob URLs por línea
-    const elevenLabsVoiceMap = { Leda: "21m00Tcm4TlvDq8ikWAM", Puck: "pNInz6obpgDQGcFmaJgB" }; // Rachel (mujer) / Adam (hombre)
     
     // Estado de respuestas seleccionadas en el test
     let selectedAnswers = {};
@@ -923,8 +923,9 @@ Sophia: Ultimately, the onus will fall on consumers to actively seek out and val
       try {
         if (!elevenLabsCache[currentLevel]) {
           document.getElementById('audioStateLabel').textContent = "Generando voces naturales (ElevenLabs)...";
+          const speakerVoiceIds = await resolveSpeakerVoiceIds(db.speakers);
           elevenLabsCache[currentLevel] = await Promise.all(
-            db.scriptList.map((line) => fetchElevenLabsClip(line, db.speakers))
+            db.scriptList.map((line) => fetchElevenLabsClip(line, speakerVoiceIds))
           );
         }
 
@@ -939,9 +940,38 @@ Sophia: Ultimately, the onus will fall on consumers to actively seek out and val
       }
     }
 
-    async function fetchElevenLabsClip(line, speakersMap) {
-      const voiceTag = speakersMap[line.speaker] || "Leda";
-      const voiceId = elevenLabsVoiceMap[voiceTag] || elevenLabsVoiceMap.Leda;
+    // Consulta las voces realmente disponibles en la cuenta de ElevenLabs del usuario,
+    // y asigna una voz femenina y una masculina distintas a cada hablante del diálogo.
+    let elevenLabsVoicesCache = null;
+    async function resolveSpeakerVoiceIds(speakersMap) {
+      if (!elevenLabsVoicesCache) {
+        const response = await fetchWithRetry('https://api.elevenlabs.io/v1/voices', {
+          method: 'GET',
+          headers: { 'xi-api-key': elevenLabsApiKey }
+        });
+        const data = await response.json();
+        elevenLabsVoicesCache = data.voices || [];
+      }
+      if (elevenLabsVoicesCache.length < 2) {
+        throw new Error("Tu cuenta de ElevenLabs no tiene suficientes voces disponibles.");
+      }
+
+      const isFemale = (v) => (v.labels?.gender || "").toLowerCase() === "female";
+      const isMale = (v) => (v.labels?.gender || "").toLowerCase() === "male";
+      const female = elevenLabsVoicesCache.find(isFemale) || elevenLabsVoicesCache[0];
+      const male = elevenLabsVoicesCache.find(v => isMale(v) && v.voice_id !== female.voice_id)
+        || elevenLabsVoicesCache.find(v => v.voice_id !== female.voice_id)
+        || female;
+
+      const speakerVoiceIds = {};
+      Object.entries(speakersMap).forEach(([speaker, tag], i) => {
+        speakerVoiceIds[speaker] = (tag === "Leda") ? female.voice_id : male.voice_id;
+      });
+      return speakerVoiceIds;
+    }
+
+    async function fetchElevenLabsClip(line, speakerVoiceIds) {
+      const voiceId = speakerVoiceIds[line.speaker] || Object.values(speakerVoiceIds)[0];
       const targetUrl = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
 
       const response = await fetchWithRetry(targetUrl, {
