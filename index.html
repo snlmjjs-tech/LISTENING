@@ -259,7 +259,15 @@
   <!-- Lógica y Controladores de Audio -->
   <script>
     // Configuración global
-    let apiKey = localStorage.getItem('geminiApiKey') || "";
+    function readStoredApiKey() {
+      try {
+        return localStorage.getItem('geminiApiKey') || "";
+      } catch (err) {
+        console.warn("No se pudo acceder a localStorage:", err);
+        return "";
+      }
+    }
+    let apiKey = readStoredApiKey();
 
     function saveApiKey() {
       const input = document.getElementById('apiKeyInput');
@@ -271,7 +279,11 @@
         return;
       }
       apiKey = value;
-      localStorage.setItem('geminiApiKey', value);
+      try {
+        localStorage.setItem('geminiApiKey', value);
+      } catch (err) {
+        console.warn("No se pudo guardar en localStorage:", err);
+      }
       input.value = "";
       status.textContent = "Clave guardada. Ya puedes escuchar el audio con voces naturales (Gemini).";
       status.className = "text-emerald-400";
