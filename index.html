@@ -98,11 +98,14 @@
             <span class="text-xs font-semibold tracking-wider text-indigo-400 uppercase" id="selectedLevelTag">NIVEL A1 · BEGINNER</span>
             <h3 class="text-xl font-bold text-white mt-1" id="selectedTitle">Meeting at a Café</h3>
           </div>
-          <!-- Selector del Motor de Audio (TTS Gemini / Web Speech API) -->
+          <!-- Selector del Motor de Audio (ElevenLabs / Gemini TTS / Web Speech API) -->
           <div class="flex flex-col items-end">
             <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5">Motor de Audio</span>
             <div class="bg-slate-900 p-1 rounded-xl border border-slate-800 flex items-center gap-1">
-              <button onclick="setAudioEngine('gemini')" id="engineGemini" class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-indigo-600 text-white shadow-md transition-all">
+              <button onclick="setAudioEngine('elevenlabs')" id="engineElevenLabs" class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-indigo-600 text-white shadow-md transition-all">
+                ElevenLabs
+              </button>
+              <button onclick="setAudioEngine('gemini')" id="engineGemini" class="px-2.5 py-1 text-xs font-semibold rounded-lg text-slate-400 hover:text-slate-200 transition-all">
                 Gemini
               </button>
               <button onclick="setAudioEngine('local')" id="engineLocal" class="px-2.5 py-1 text-xs font-semibold rounded-lg text-slate-400 hover:text-slate-200 transition-all">
@@ -150,18 +153,32 @@
           </button>
         </div>
 
-        <!-- Configuración de la clave API de Gemini (necesaria para voces naturales) -->
-        <div id="apiKeyPanel" class="bg-slate-900/60 border border-amber-500/30 rounded-xl p-4 text-xs space-y-2">
-          <p class="text-amber-300 font-semibold flex items-center gap-2">
-            <i class="fa-solid fa-key"></i> Clave de API de Gemini
-          </p>
-          <p class="text-slate-400">Para usar voces naturales (no robotizadas) necesitas tu propia clave de Gemini. Se guarda solo en tu navegador.</p>
-          <div class="flex gap-2">
-            <input id="apiKeyInput" type="password" placeholder="Pega aquí tu clave de Gemini API"
-              class="flex-grow bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500" />
-            <button onclick="saveApiKey()" class="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold">Guardar</button>
+        <!-- Configuración de claves API (necesarias para voces naturales) -->
+        <div class="bg-slate-900/60 border border-amber-500/30 rounded-xl p-4 text-xs space-y-4">
+          <div class="space-y-2">
+            <p class="text-amber-300 font-semibold flex items-center gap-2">
+              <i class="fa-solid fa-key"></i> Clave de API de ElevenLabs (recomendada, voces más naturales)
+            </p>
+            <p class="text-slate-400">ElevenLabs ofrece las voces más realistas. Crea una clave gratis en elevenlabs.io. Se guarda solo en tu navegador.</p>
+            <div class="flex gap-2">
+              <input id="elevenLabsKeyInput" type="password" placeholder="Pega aquí tu clave de ElevenLabs"
+                class="flex-grow bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500" />
+              <button onclick="saveElevenLabsKey()" class="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold">Guardar</button>
+            </div>
+            <p id="elevenLabsKeyStatus" class="text-slate-500"></p>
           </div>
-          <p id="apiKeyStatus" class="text-slate-500"></p>
+          <div class="space-y-2 border-t border-slate-800 pt-3">
+            <p class="text-amber-300 font-semibold flex items-center gap-2">
+              <i class="fa-solid fa-key"></i> Clave de API de Gemini (alternativa)
+            </p>
+            <p class="text-slate-400">Voces naturales con Gemini, como respaldo si no usas ElevenLabs. Se guarda solo en tu navegador.</p>
+            <div class="flex gap-2">
+              <input id="apiKeyInput" type="password" placeholder="Pega aquí tu clave de Gemini API"
+                class="flex-grow bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500" />
+              <button onclick="saveApiKey()" class="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold">Guardar</button>
+            </div>
+            <p id="apiKeyStatus" class="text-slate-500"></p>
+          </div>
         </div>
       </div>
 
@@ -174,7 +191,7 @@
         </div>
         <div class="flex gap-2 items-start">
           <i class="fa-solid fa-rotate-left text-indigo-400 mt-0.5"></i>
-          <p>Puedes cambiar entre el audio de <strong>Gemini (ultra realista)</strong> y <strong>Local</strong> utilizando el selector arriba del visualizador si tienes algún problema de red.</p>
+          <p>Puedes cambiar entre <strong>ElevenLabs (la más natural)</strong>, <strong>Gemini</strong> y <strong>Local</strong> utilizando el selector arriba del visualizador si tienes algún problema de red.</p>
         </div>
       </div>
     </div>
@@ -240,7 +257,7 @@
       <div class="flex items-center gap-4 text-xs text-slate-400">
         <span>Niveles: A1 - B1 - B2 - C</span>
         <span>·</span>
-        <span>Audio con soporte Gemini TTS</span>
+        <span>Audio con soporte ElevenLabs / Gemini TTS</span>
       </div>
     </div>
   </footer>
@@ -259,15 +276,24 @@
   <!-- Lógica y Controladores de Audio -->
   <script>
     // Configuración global
-    function readStoredApiKey() {
+    function readStoredKey(name) {
       try {
-        return localStorage.getItem('geminiApiKey') || "";
+        return localStorage.getItem(name) || "";
       } catch (err) {
         console.warn("No se pudo acceder a localStorage:", err);
         return "";
       }
     }
-    let apiKey = readStoredApiKey();
+    function writeStoredKey(name, value) {
+      try {
+        localStorage.setItem(name, value);
+      } catch (err) {
+        console.warn("No se pudo guardar en localStorage:", err);
+      }
+    }
+
+    let apiKey = readStoredKey('geminiApiKey');
+    let elevenLabsApiKey = readStoredKey('elevenLabsApiKey');
 
     function saveApiKey() {
       const input = document.getElementById('apiKeyInput');
@@ -279,16 +305,29 @@
         return;
       }
       apiKey = value;
-      try {
-        localStorage.setItem('geminiApiKey', value);
-      } catch (err) {
-        console.warn("No se pudo guardar en localStorage:", err);
-      }
+      writeStoredKey('geminiApiKey', value);
       input.value = "";
       status.textContent = "Clave guardada. Ya puedes escuchar el audio con voces naturales (Gemini).";
       status.className = "text-emerald-400";
       currentAudioElement = null;
       audioBlobUrl = null;
+    }
+
+    function saveElevenLabsKey() {
+      const input = document.getElementById('elevenLabsKeyInput');
+      const status = document.getElementById('elevenLabsKeyStatus');
+      const value = input.value.trim();
+      if (!value) {
+        status.textContent = "Introduce una clave válida.";
+        status.className = "text-rose-400";
+        return;
+      }
+      elevenLabsApiKey = value;
+      writeStoredKey('elevenLabsApiKey', value);
+      input.value = "";
+      status.textContent = "Clave guardada. Ya puedes escuchar el audio con voces naturales (ElevenLabs).";
+      status.className = "text-emerald-400";
+      elevenLabsCache = {};
     }
 
     function initApiKeyPanel() {
@@ -297,13 +336,21 @@
         status.textContent = "Clave guardada en este navegador. Las voces de Gemini están activas.";
         status.className = "text-emerald-400";
       }
+      const elStatus = document.getElementById('elevenLabsKeyStatus');
+      if (elevenLabsApiKey) {
+        elStatus.textContent = "Clave guardada en este navegador. Las voces de ElevenLabs están activas.";
+        elStatus.className = "text-emerald-400";
+      }
     }
-    let currentEngine = 'gemini'; // 'gemini' o 'local'
+    let currentEngine = 'elevenlabs'; // 'elevenlabs', 'gemini' o 'local'
     let currentLevel = 'a1';
     let isPlaying = false;
     let audioBlobUrl = null;
     let currentAudioElement = null; // Guardará el objeto de reproducción de audio actual
     let webSpeechIndex = 0;
+    let elevenLabsIndex = 0;
+    let elevenLabsCache = {}; // levelKey -> array de blob URLs por línea
+    const elevenLabsVoiceMap = { Leda: "21m00Tcm4TlvDq8ikWAM", Puck: "pNInz6obpgDQGcFmaJgB" }; // Rachel (mujer) / Adam (hombre)
     
     // Estado de respuestas seleccionadas en el test
     let selectedAnswers = {};
@@ -506,22 +553,27 @@ Sophia: Ultimately, the onus will fall on consumers to actively seek out and val
     // Control del estilo del motor de voz seleccionado
     function setAudioEngine(engine) {
       currentEngine = engine;
+      const elBtn = document.getElementById('engineElevenLabs');
       const geminiBtn = document.getElementById('engineGemini');
       const localBtn = document.getElementById('engineLocal');
-      
+      const activeClass = "px-2.5 py-1 text-xs font-semibold rounded-lg bg-indigo-600 text-white shadow-md transition-all";
+      const inactiveClass = "px-2.5 py-1 text-xs font-semibold rounded-lg text-slate-400 hover:text-slate-200 transition-all";
+
       stopAudio();
-      
+
       // Limpiar rastro de cualquier audio anterior al cambiar de motor
       currentAudioElement = null;
       audioBlobUrl = null;
 
-      if (engine === 'gemini') {
-        geminiBtn.className = "px-2.5 py-1 text-xs font-semibold rounded-lg bg-indigo-600 text-white shadow-md transition-all";
-        localBtn.className = "px-2.5 py-1 text-xs font-semibold rounded-lg text-slate-400 hover:text-slate-200 transition-all";
+      elBtn.className = engine === 'elevenlabs' ? activeClass : inactiveClass;
+      geminiBtn.className = engine === 'gemini' ? activeClass : inactiveClass;
+      localBtn.className = engine === 'local' ? activeClass : inactiveClass;
+
+      if (engine === 'elevenlabs') {
+        showToast("Motor ElevenLabs", "El sistema usará las voces hiperrealistas de ElevenLabs para este nivel.");
+      } else if (engine === 'gemini') {
         showToast("Motor Gemini", "El sistema usará la voz artificial avanzada de Gemini para este nivel.");
       } else {
-        localBtn.className = "px-2.5 py-1 text-xs font-semibold rounded-lg bg-indigo-600 text-white shadow-md transition-all";
-        geminiBtn.className = "px-2.5 py-1 text-xs font-semibold rounded-lg text-slate-400 hover:text-slate-200 transition-all";
         showToast("Motor Local", "Usando el sintetizador de voz nativo de tu navegador.");
       }
     }
@@ -707,7 +759,7 @@ Sophia: Ultimately, the onus will fall on consumers to actively seek out and val
     }
 
     function pauseAudio() {
-      if (currentEngine === 'gemini') {
+      if (currentEngine === 'gemini' || currentEngine === 'elevenlabs') {
         if (currentAudioElement) {
           currentAudioElement.pause();
         }
@@ -719,10 +771,11 @@ Sophia: Ultimately, the onus will fall on consumers to actively seek out and val
     }
 
     function stopAudio() {
-      if (currentEngine === 'gemini') {
+      if (currentEngine === 'gemini' || currentEngine === 'elevenlabs') {
         if (currentAudioElement) {
           currentAudioElement.pause();
           currentAudioElement.currentTime = 0;
+          currentAudioElement.onended = null;
         }
       } else {
         window.speechSynthesis.cancel();
@@ -735,6 +788,11 @@ Sophia: Ultimately, the onus will fall on consumers to actively seek out and val
     async function playAudio() {
       const db = levelsDb[currentLevel];
       document.getElementById('audioStateLabel').textContent = "Cargando audio interactivo...";
+
+      if (currentEngine === 'elevenlabs') {
+        await playElevenLabs(db);
+        return;
+      }
 
       if (currentEngine === 'gemini') {
         try {
@@ -846,6 +904,78 @@ Sophia: Ultimately, the onus will fall on consumers to actively seek out and val
       }
     }
 
+    // Motor de Voz ElevenLabs (hiperrealista, una petición por línea de diálogo)
+    async function playElevenLabs(db) {
+      // Si una línea ya estaba en pausa, simplemente la reanudamos
+      if (currentAudioElement && currentAudioElement.src && elevenLabsCache[currentLevel]) {
+        currentAudioElement.play();
+        setPlayState(true);
+        document.getElementById('audioStateLabel').textContent = "Reproduciendo diálogo real (ElevenLabs)...";
+        return;
+      }
+
+      if (!elevenLabsApiKey) {
+        showToast("Falta tu clave de API", "Agrega tu clave de ElevenLabs abajo de los controles para escuchar voces naturales.");
+        playLocalSynthesizer(db.scriptList);
+        return;
+      }
+
+      try {
+        if (!elevenLabsCache[currentLevel]) {
+          document.getElementById('audioStateLabel').textContent = "Generando voces naturales (ElevenLabs)...";
+          elevenLabsCache[currentLevel] = await Promise.all(
+            db.scriptList.map((line) => fetchElevenLabsClip(line, db.speakers))
+          );
+        }
+
+        elevenLabsIndex = 0;
+        setPlayState(true);
+        document.getElementById('audioStateLabel').textContent = "Reproduciendo diálogo real (ElevenLabs)...";
+        playElevenLabsClip(elevenLabsCache[currentLevel]);
+      } catch (error) {
+        console.warn("La API de ElevenLabs falló: ", error);
+        showToast("Aviso de Red", "Iniciando lector nativo de respaldo para este nivel.");
+        playLocalSynthesizer(db.scriptList);
+      }
+    }
+
+    async function fetchElevenLabsClip(line, speakersMap) {
+      const voiceTag = speakersMap[line.speaker] || "Leda";
+      const voiceId = elevenLabsVoiceMap[voiceTag] || elevenLabsVoiceMap.Leda;
+      const targetUrl = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
+
+      const response = await fetchWithRetry(targetUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'xi-api-key': elevenLabsApiKey
+        },
+        body: JSON.stringify({
+          text: line.text,
+          model_id: "eleven_multilingual_v2",
+          voice_settings: { stability: 0.45, similarity_boost: 0.85 }
+        })
+      });
+
+      const audioBlob = await response.blob();
+      return URL.createObjectURL(audioBlob);
+    }
+
+    function playElevenLabsClip(clipUrls) {
+      if (elevenLabsIndex >= clipUrls.length || !isPlaying) {
+        setPlayState(false);
+        document.getElementById('audioStateLabel').textContent = "Escucha finalizada";
+        return;
+      }
+
+      currentAudioElement = new Audio(clipUrls[elevenLabsIndex]);
+      currentAudioElement.onended = () => {
+        elevenLabsIndex++;
+        playElevenLabsClip(clipUrls);
+      };
+      currentAudioElement.play();
+    }
+
     // Petición con reintentos para mitigar problemas temporales de red
     async function fetchWithRetry(url, options, retries = 5, delay = 1000) {
       try {
@@ -859,13 +989,44 @@ Sophia: Ultimately, the onus will fall on consumers to actively seek out and val
       }
     }
 
-    // Motor de Voz Local (Web Speech API) simulador de interlocutores
+    // Motor de Voz Local (Web Speech API) — selecciona las voces más naturales disponibles en el dispositivo
+    let bestFemaleVoice = null;
+    let bestMaleVoice = null;
+
+    function pickBestVoices() {
+      const voices = window.speechSynthesis.getVoices().filter(v => v.lang.startsWith("en"));
+      if (!voices.length) return;
+
+      // Preferir voces "neuronales/online" del sistema, mucho menos robóticas que las offline por defecto
+      const qualityRank = (v) => {
+        const n = v.name.toLowerCase();
+        if (n.includes("natural") || n.includes("neural")) return 3;
+        if (n.includes("online") || n.includes("google")) return 2;
+        return v.localService ? 0 : 1;
+      };
+
+      const femaleHints = ["female", "emma", "samantha", "victoria", "zira", "aria", "jenny", "online (natural) - "];
+      const maleHints = ["male", "david", "guy", "mark", "daniel", "fred", "alex"];
+
+      const female = voices.filter(v => femaleHints.some(h => v.name.toLowerCase().includes(h)));
+      const male = voices.filter(v => maleHints.some(h => v.name.toLowerCase().includes(h)));
+
+      const sortByQuality = (list) => list.sort((a, b) => qualityRank(b) - qualityRank(a));
+      bestFemaleVoice = sortByQuality(female)[0] || sortByQuality(voices)[0];
+      bestMaleVoice = sortByQuality(male)[0] || sortByQuality(voices)[1] || bestFemaleVoice;
+    }
+
+    if (typeof window.speechSynthesis !== 'undefined') {
+      pickBestVoices();
+      window.speechSynthesis.onvoiceschanged = pickBestVoices;
+    }
+
     function playLocalSynthesizer(scriptList) {
       window.speechSynthesis.cancel();
       webSpeechIndex = 0;
       setPlayState(true);
       document.getElementById('audioStateLabel').textContent = "Reproduciendo diálogo local...";
-      
+
       speakNextLine(scriptList);
     }
 
@@ -879,11 +1040,16 @@ Sophia: Ultimately, the onus will fall on consumers to actively seek out and val
       const line = scriptList[webSpeechIndex];
       const utterance = new SpeechSynthesisUtterance(line.text);
       utterance.lang = "en-US";
-      
-      // Simular cambio de voces mediante el tono de la síntesis de voz del navegador
+
+      // Usar la voz neuronal/online más natural disponible en el dispositivo, según el hablante
       const isLeft = line.speaker === "Emma" || line.speaker === "Sarah" || line.speaker === "Olivia" || line.speaker === "Sophia";
-      utterance.pitch = isLeft ? 1.25 : 0.85; 
-      utterance.rate = currentLevel === 'a1' ? 0.75 : currentLevel === 'b1' ? 0.9 : 1.0; 
+      const chosenVoice = isLeft ? bestFemaleVoice : bestMaleVoice;
+      if (chosenVoice) {
+        utterance.voice = chosenVoice;
+      } else {
+        utterance.pitch = isLeft ? 1.15 : 0.9;
+      }
+      utterance.rate = currentLevel === 'a1' ? 0.85 : currentLevel === 'b1' ? 0.95 : 1.0;
 
       utterance.onend = () => {
         webSpeechIndex++;
