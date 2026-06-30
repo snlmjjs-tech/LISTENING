@@ -149,6 +149,20 @@
             <i class="fa-solid fa-chevron-down transition-transform duration-300" id="scriptArrow"></i>
           </button>
         </div>
+
+        <!-- Configuración de la clave API de Gemini (necesaria para voces naturales) -->
+        <div id="apiKeyPanel" class="bg-slate-900/60 border border-amber-500/30 rounded-xl p-4 text-xs space-y-2">
+          <p class="text-amber-300 font-semibold flex items-center gap-2">
+            <i class="fa-solid fa-key"></i> Clave de API de Gemini
+          </p>
+          <p class="text-slate-400">Para usar voces naturales (no robotizadas) necesitas tu propia clave de Gemini. Se guarda solo en tu navegador.</p>
+          <div class="flex gap-2">
+            <input id="apiKeyInput" type="password" placeholder="Pega aquí tu clave de Gemini API"
+              class="flex-grow bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500" />
+            <button onclick="saveApiKey()" class="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold">Guardar</button>
+          </div>
+          <p id="apiKeyStatus" class="text-slate-500"></p>
+        </div>
       </div>
 
       <!-- Banner Informativo -->
@@ -245,7 +259,33 @@
   <!-- Lógica y Controladores de Audio -->
   <script>
     // Configuración global
-    const apiKey = ""; // La clave se inyectará dinámicamente en el entorno de ejecución
+    let apiKey = localStorage.getItem('geminiApiKey') || "";
+
+    function saveApiKey() {
+      const input = document.getElementById('apiKeyInput');
+      const status = document.getElementById('apiKeyStatus');
+      const value = input.value.trim();
+      if (!value) {
+        status.textContent = "Introduce una clave válida.";
+        status.className = "text-rose-400";
+        return;
+      }
+      apiKey = value;
+      localStorage.setItem('geminiApiKey', value);
+      input.value = "";
+      status.textContent = "Clave guardada. Ya puedes escuchar el audio con voces naturales (Gemini).";
+      status.className = "text-emerald-400";
+      currentAudioElement = null;
+      audioBlobUrl = null;
+    }
+
+    function initApiKeyPanel() {
+      const status = document.getElementById('apiKeyStatus');
+      if (apiKey) {
+        status.textContent = "Clave guardada en este navegador. Las voces de Gemini están activas.";
+        status.className = "text-emerald-400";
+      }
+    }
     let currentEngine = 'gemini'; // 'gemini' o 'local'
     let currentLevel = 'a1';
     let isPlaying = false;
@@ -448,6 +488,7 @@ Sophia: Ultimately, the onus will fall on consumers to actively seek out and val
     // Inicialización al cargar la página
     window.addEventListener('DOMContentLoaded', () => {
       renderContent();
+      initApiKeyPanel();
     });
 
     // Control del estilo del motor de voz seleccionado
@@ -693,6 +734,10 @@ Sophia: Ultimately, the onus will fall on consumers to actively seek out and val
             return;
           }
 
+          if (!apiKey) {
+            throw new Error("No hay clave de API de Gemini configurada.");
+          }
+
           // Generar diálogo interactivo mediante Gemini TTS API
           const textToSynthesize = db.text;
           const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
@@ -777,7 +822,11 @@ Sophia: Ultimately, the onus will fall on consumers to actively seek out and val
 
         } catch (error) {
           console.warn("La API de Gemini falló o no tiene llave cargada. Activando Web Speech API del navegador: ", error);
-          showToast("Aviso de Red", "Iniciando lector nativo de respaldo para este nivel.");
+          if (!apiKey) {
+            showToast("Falta tu clave de API", "Agrega tu clave de Gemini abajo de los controles para escuchar voces naturales.");
+          } else {
+            showToast("Aviso de Red", "Iniciando lector nativo de respaldo para este nivel.");
+          }
           playLocalSynthesizer(db.scriptList);
         }
       } else {
